@@ -1,0 +1,42 @@
+---
+title: "Can winter Rs a proxy for annual Rh?"
+author: "Stephanie Pennington"
+date: "9/29/2021"
+output: html_document
+---
+
+
+
+```{r setup, include = FALSE}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(DT)
+
+# We want to load in the SRDB and search for relevant studies
+srdb_data <- read_csv("../Data/srdb-data.csv")
+
+vars <- c("Rs_winter", "Rh_annual")
+```
+
+```{r , inclue = FALSE}
+# How many Rs_winter observations are there in SRDB?
+winter_rs <- nrow(drop_na(srdb_data, Rs_winter))
+    
+# Also how many Rs_winter observations do we have that also have an Rh_annual value? 
+srdb_data %>% 
+    select(Record_number, Study_number, Study_midyear, Biome, Rs_winter, Rs_annual, Rh_annual) %>% 
+    drop_na(all_of(vars)) -> srdb_winter
+
+rsrh_obs <- nrow(srdb_winter)
+rsrh_studies <- length(unique(srdb_winter$Study_number))
+
+# Let's make an interactive table of the winter SRDB entries
+datatable(srdb_winter)
+    
+```
+
+### There are `r winter_rs` `Rs_winter` measurements reported in the SRDB.
+
+### There are `r rsrh_obs` observations in `r rsrh_studies` studies that report both `Rs_winter` and `Rh_annual` reported in the SRDB.
+
