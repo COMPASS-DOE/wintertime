@@ -1,11 +1,25 @@
 ---
-title: "Can winter Rs a proxy for annual Rh? Can this be scaled globally?"
+title: "Science Question: Can winter Rs a proxy for annual Rh? Can this be scaled globally?"
 author: "Stephanie Pennington"
 date: "9/29/2021"
 output: html_document
 ---
 
-**Hypothesis**: Annual soil respiration (Rs) is composed of autotropic (Ra) and heterotrophic (Rh) respiration. In the winter, trees and other rooted organisms are dormant and ideally produce a negligible amount of CO2 (responsible for Ra). Therefor we hypothesize that wintertime Rs is mainly comprised of microbial activity (Rh), and wintertime Rs can be used as a proxy for annual Rh. This relationship could allow for globally scaled estimates of Rh.
+Annual soil respiration (Rs) is composed of autotropic (Ra) and heterotrophic (Rh) respiration. 
+
+**Hypothesis 1:** In the winter, plants are dormant and produce negligible respiration. Therefore we hypothesize that wintertime Rs is mainly comprised of microbial activity (Rh). 
+
+_How do we test H1?_ 
+- COSORE? Need sites with wintertime Rs and Rh measurements
+- SRDB? What studies report Rs_winter and separate Rh and Ra annually. Some may have reported wintertime Rh but not entered into SRDB
+- Lit searching?
+- AmeriFlux? Sites report ER (total ecosystem respiration); if in winter ER gets close to Rs (from SRDB?) that's suggestive, needs more research
+
+**Hypothesis 2:** Wintertime Rs (equals Rh, if H1 is true) can be used as a proxy for annual Rh. This relationship could allow for biome-scale estimates of Rh.
+
+_How do we test H2?_
+- SRDB: look at studies that report Rs_winter and Rh_annual
+- COSORE?
 
 ```{r setup, include = FALSE}
 library(dplyr)
@@ -40,6 +54,5 @@ datatable(srdb_winter)
 
 ### There are `r rsrh_obs` observations in `r rsrh_studies` studies that report both `Rs_winter` and `Rh_annual` reported in the SRDB.
 
-#### Questions
-- What exactly is Rh composed of? Rr and what?
-- How can I efficiently search for these papers?
+#### Key Terms to Search For
+- soil respiration; winter; heterotrophic respiration
