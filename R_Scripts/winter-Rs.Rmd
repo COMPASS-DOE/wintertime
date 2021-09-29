@@ -40,3 +40,6 @@ datatable(srdb_winter)
 
 ### There are `r rsrh_obs` observations in `r rsrh_studies` studies that report both `Rs_winter` and `Rh_annual` reported in the SRDB.
 
+#### Questions
+- What exactly is Rh composed of? Rr and what?
+- How can I efficiently search for these papers?
