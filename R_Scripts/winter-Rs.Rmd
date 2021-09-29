@@ -1,11 +1,11 @@
 ---
-title: "Can winter Rs a proxy for annual Rh?"
+title: "Can winter Rs a proxy for annual Rh? Can this be scaled globally?"
 author: "Stephanie Pennington"
 date: "9/29/2021"
 output: html_document
 ---
 
-
+**Hypothesis**: Annual soil respiration (Rs) is composed of autotropic (Ra) and heterotrophic (Rh) respiration. In the winter, trees and other rooted organisms are dormant and ideally produce a negligible amount of CO2 (responsible for Ra). Therefor we hypothesize that wintertime Rs is mainly comprised of microbial activity (Rh), and wintertime Rs can be used as a proxy for annual Rh. This relationship could allow for globally scaled estimates of Rh.
 
 ```{r setup, include = FALSE}
 library(dplyr)
