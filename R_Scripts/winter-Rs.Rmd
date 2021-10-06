@@ -14,6 +14,7 @@ _How do we test H1?_
 - SRDB? What studies report Rs_winter and separate Rh and Ra annually. Some may have reported wintertime Rh but not entered into SRDB
 - Lit searching?
 - AmeriFlux? Sites report ER (total ecosystem respiration); if in winter ER gets close to Rs (from SRDB?) that's suggestive, needs more research
+- transplant exp???
 
 **Hypothesis 2:** Wintertime Rs (equals Rh, if H1 is true) can be used as a proxy for annual Rh. This relationship could allow for biome-scale estimates of Rh.
 
@@ -26,6 +27,9 @@ library(dplyr)
 library(readr)
 library(tidyr)
 library(DT)
+library(ggplot2)
+
+theme_set(theme_minimal())
 
 # We want to load in the SRDB and search for relevant studies
 srdb_data <- read_csv("../Data/srdb-data.csv")
@@ -33,20 +37,22 @@ srdb_data <- read_csv("../Data/srdb-data.csv")
 vars <- c("Rs_winter", "Rh_annual")
 ```
 
-```{r , inclue = FALSE}
+```{r data-prep, echo = FALSE}
 # How many Rs_winter observations are there in SRDB?
 winter_rs <- nrow(drop_na(srdb_data, Rs_winter))
     
 # Also how many Rs_winter observations do we have that also have an Rh_annual value? 
 srdb_data %>% 
-    select(Record_number, Study_number, Study_midyear, Biome, Rs_winter, Rs_annual, Rh_annual) %>% 
+   # select(Record_number, Study_number, Study_midyear, Biome, Rs_winter, Rs_annual, Rh_annual) %>% 
     drop_na(all_of(vars)) -> srdb_winter
 
 rsrh_obs <- nrow(srdb_winter)
 rsrh_studies <- length(unique(srdb_winter$Study_number))
 
 # Let's make an interactive table of the winter SRDB entries
-datatable(srdb_winter)
+srdb_winter %>% 
+    select(Record_number, Study_number, Study_midyear, Biome, Rs_winter, Rs_annual, Rh_annual) %>% 
+    datatable()
     
 ```
 
@@ -56,3 +62,12 @@ datatable(srdb_winter)
 
 #### Key Terms to Search For
 - soil respiration; winter; heterotrophic respiration
+
+```{r preliminary-graphs, echo = FALSE}
+
+srdb_winter %>% 
+    ggplot(aes(x = Rs_winter, y = Rh_annual)) +
+    geom_point(aes(color = Biome))
+
+```
+
