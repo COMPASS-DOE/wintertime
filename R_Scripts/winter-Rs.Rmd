@@ -28,6 +28,7 @@ library(readr)
 library(tidyr)
 library(DT)
 library(ggplot2)
+library(raster)
 
 theme_set(theme_minimal())
 
@@ -70,4 +71,136 @@ srdb_winter %>%
     geom_point(aes(color = Biome))
 
 ```
+
+
+Extract locations from srdb_winter
+ Warmest 3 months - Coldest 3 months -> temperature seasonality
+ Wettest 3 months - Dryest 3 months -> precipitation seasonality
+ Compute MAT and MAP
+ 
+```{r mat-map}
+# Download worldclim data for precip and tmean if necessary, into wc10/ folder
+precip <- getData("worldclim", path = "../Data/wc10/", var = "prec", res = 10, download = !file.exists("../Data/wc10/wc10/precip1.hdr"))
+tmean <- getData("worldclim", path = "../Data/wc10/", var = "tmean", res = 10, download = !file.exists("../Data/wc10/wc10/tmean1.hdr"))
+
+# Pull out srdb_winter dataset latitudes and longitudes
+srdb_winter %>%
+  dplyr::select(Record_number, Longitude, Latitude) -> winter_coords
+
+# Extract srdb_winter location data from worldclim data for precip...
+raster::extract(precip, winter_coords[2:3]) -> precip_coords
+apply(precip_coords, 1, sum) -> map_winter
+cbind(winter_coords, map_winter) -> map_coords
+
+
+# ...and tmean
+raster::extract(tmean, winter_coords[2:3]) -> tmean_vals
+apply(tmean_vals, 1, mean) -> mat_winter
+cbind(map_coords, mat_winter)  %>%
+  # Temp data is stored in degC * 10, so we need to divide to get back to degC
+  mutate(mat_winter = mat_winter / 10)  %>% 
+    distinct(Latitude, Longitude, .keep_all = TRUE) -> winter_points
+
+
+# Extract global climate space data
+raster::as.data.frame(precip, xy = TRUE) %>%
+  drop_na() -> precip_global
+
+# Calculate annual sum for precip...
+precip_global %>%
+  dplyr::select(-x, -y) %>%
+  apply(1, sum) -> map_global
+
+raster::as.data.frame(tmean, xy = TRUE) %>%
+  drop_na() -> tmean_global
+
+# ...and mean for temperature
+tmean_global %>%
+  dplyr::select(-x, -y) %>%
+  apply(1, mean) -> mat_global
+
+# Create tibble with corresponding coordinates
+tibble(x = tmean_global$x, y = tmean_global$y, mat = as.vector(mat_global)) -> mat
+tibble(x = precip_global$x, y = precip_global$y, map = as.vector(map_global)) -> map
+
+left_join(map, mat, by = c("x", "y")) %>%
+  # Temp data is stored in degC * 10, so we need to divide to get back to degC
+  mutate(mat = mat / 10) -> map_mat_global
+
+# Try Mark Tjoelker's suggestion re Whittaker biomes
+library(plotbiomes) # devtools::install_github("valentinitnelav/plotbiomes")
+p_inset <- whittaker_base_plot() +
+  geom_point(data = winter_points, aes(x = mat_winter, y = map_winter / 10),
+             color = "black", shape = 4) +
+  theme(axis.title = element_blank(),
+        axis.text = element_text(size = 8),
+        legend.text = element_text(size = 7),
+        legend.key.size = unit(0.4, "lines"),
+        legend.position = c(0.35, 0.75),
+        legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.border = element_rect(colour = "black", fill = NA, size = 0.5))
+
+# SP's main climate space plot
+p <- ggplot() +
+  geom_hex(data = map_mat_global,
+           aes(x = mat, y = map / 10), bins = 100, na.rm = TRUE) +
+  scale_fill_viridis_c(name = "Grid cells", begin = 0.85, end = 0) +
+  geom_point(data = winter_points, aes(x = mat_winter, y = map_winter / 10),
+             color = "black", shape = 4, size = 1.5, na.rm = TRUE) +
+  theme_minimal() +
+  labs(x = "MAT (°C)", y = "MAP (cm)")
+print(p)
+#ggsave_quiet("figures/figure3-climate.png")
+
+suppressMessages(library(cowplot, quietly = TRUE))
+p_new <- ggdraw() +
+  draw_plot(p) +
+  draw_plot(p_inset, x = 0.1, y = 0.5, width = 0.4, height = 0.45)
+print(p_new)
+#save_plot("figures/figure3-climate-whittaker.png", p_new, base_height = 5)
+```
+
+```{r}
+
+cbind(winter_coords, precip_coords) %>% 
+pivot_longer(prec1:prec12) %>% 
+  group_by(Record_number) -> precip_monthly
+
+precip_monthly %>% 
+  arrange(desc(value), .by_group = TRUE) %>% 
+  slice(1:3) %>% 
+  summarise(P_High_Avg = round(mean(value), digits = 2))  -> p_high
+
+precip_monthly %>% 
+  arrange(value, .by_group = TRUE) %>% 
+  slice(1:3) %>% 
+  summarise(P_Low_Avg = round(mean(value), digits = 2)) -> p_low 
+
+cbind(winter_coords, tmean_vals) %>% 
+pivot_longer(tmean1:tmean12) %>% 
+  mutate(value = value / 10) %>% 
+  group_by(Record_number) -> tmean_monthly
+
+tmean_monthly %>% 
+  arrange(value, .by_group = TRUE) %>% 
+  slice(1:3) %>% 
+  summarise(T_Low_Avg = round(mean(value), digits = 2)) -> t_low 
+
+tmean_monthly %>% 
+  arrange(desc(value), .by_group = TRUE) %>% 
+  slice(1:3) %>% 
+  summarise(T_High_Avg = round(mean(value), digits = 2)) -> t_high
+
+p_high %>% 
+  left_join(p_low, by = c("Record_number")) %>% 
+  left_join(t_high, by = c("Record_number")) %>% 
+  left_join(t_low, by = c("Record_number")) %>% 
+  mutate(precip_seasonality = P_High_Avg - P_Low_Avg, temp_seasonality = T_High_Avg - T_Low_Avg) %>% 
+  dplyr::select(Record_number, precip_seasonality, temp_seasonality) -> seasonality
+
+```
+
 
