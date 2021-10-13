@@ -39,3 +39,6 @@ vignettes/*.pdf
 .Renviron
 R_Scripts/winter-Rs.html
 .DS_Store
+
+# WorldClim data
+wc10/
