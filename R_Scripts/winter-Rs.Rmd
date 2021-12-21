@@ -1,11 +1,60 @@
 ---
-title: "Science Question: Can winter Rs a proxy for annual Rh? Can this be scaled globally?"
+title: "Can winter Rs a proxy for annual Rh? Can this be scaled globally?"
 author: "Stephanie Pennington"
 date: "9/29/2021"
 output: html_document
 ---
 
-Annual soil respiration (Rs) is composed of autotropic (Ra) and heterotrophic (Rh) respiration. 
+```{r setup, include = FALSE}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(DT)
+library(ggplot2)
+library(raster)
+library(cowplot)
+library(ggmap)
+library(viridis)
+library(ggrepel)
+library(scales)
+library(performance)
+library(MASS)
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+theme_set(theme_minimal())
+
+# We want to load in the SRDB and search for relevant studies
+srdb_data <- read_csv("../Data/srdb-data.csv")
+
+vars <- c("Rs_winter", "Rs_annual")
+```
+
+### Motivation
+
+```{r motivation, echo = FALSE}
+
+tibble::tibble(Month = seq(1, 12, by = .1),
+               Rs = dnorm(Month, mean = 7, sd = 2),
+               Rh = dnorm(Month, mean = 7, sd = 2)) %>% 
+  mutate(Rh = Rh * 0.6) -> df
+
+  ggplot(df) +
+  geom_line(aes(x = Month, y = Rs)) +
+  geom_line(aes(x = Month, y = Rh), color = "chartreuse4") +
+  geom_point(aes(x = 1, y = 0.002), color = "red3", size = 3) +
+  geom_segment(aes(x = 7, y = 0.12, yend= 0.2, xend = 7), color = "tan4", linetype = "dashed") +
+  labs(x = "Month", y = "Soil Respiration") + theme_cowplot() +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()) +
+  scale_x_continuous(breaks= pretty_breaks())
+
+```
+
+Annual soil respiration (Rs) is composed of autotropic (Ra) and heterotrophic (Rh) respiration. Above is a graph of how total Rs (**black** line) changes throughout the year in an ecosystem with average seasonality. Our knowledge of Rh (<span style="color:green">green</span> line) is that it is (1) some proportion of the total Rs and (2) decreases substantially during dormancy. We can then assume that Ra (<span style="color:brown">brown</span> dashed line) would be the difference between the black line and the green line with some variability. This study aims to characterize what is happening during winter / dormancy (<span style="color:red">red</span> dot) and whether the Rs value is actually representing only Rh.
+
+**Goal Statement:** To quantify (1) how well we can predict heterotrophic respiration using winter soil respiration and (2) whether we can leverage this relationship on a larger scale.
 
 **Hypothesis 1:** In the winter, plants are dormant and produce negligible respiration. Therefore we hypothesize that wintertime Rs is mainly comprised of microbial activity (Rh). 
 
@@ -22,25 +71,6 @@ _How do we test H2?_
 - SRDB: look at studies that report Rs_winter and Rh_annual
 - COSORE?
 
-```{r setup, include = FALSE}
-library(dplyr)
-library(readr)
-library(tidyr)
-library(DT)
-library(ggplot2)
-library(raster)
-library(cowplot)
-library(ggmap)
-library(viridis)
-
-theme_set(theme_minimal())
-
-# We want to load in the SRDB and search for relevant studies
-srdb_data <- read_csv("../Data/srdb-data.csv")
-
-vars <- c("Rs_winter", "Rh_annual")
-```
-
 ```{r data-prep, echo = FALSE}
 # How many Rs_winter observations are there in SRDB?
 winter_rs <- nrow(drop_na(srdb_data, Rs_winter))
@@ -53,8 +83,8 @@ srdb_data %>%
    # select(Record_number, Study_number, Study_midyear, Biome, Rs_winter, Rs_annual, Rh_annual) %>% 
     drop_na(all_of(vars)) -> srdb_winter
 
-rsrh_obs <- nrow(srdb_winter)
-rsrh_studies <- length(unique(srdb_winter$Study_number))
+obs <- nrow(srdb_winter)
+studies <- length(unique(srdb_winter$Study_number))
 
 # Let's make an interactive table of the winter SRDB entries
 srdb_winter %>% 
@@ -65,12 +95,10 @@ srdb_winter %>%
 
 ### There are `r winter_rs` `Rs_winter` measurements reported in the SRDB.
 
-### There are `r rsrh_obs` observations in `r rsrh_studies` studies that report both `Rs_winter` and `Rh_annual` reported in the SRDB.
+### There are `r obs` observations in `r studies` studies that report both `Rs_winter` and `RS_annual` reported in the SRDB.
 
 #### Key Terms to Search For
 - soil respiration; winter; heterotrophic respiration
-
-
 
 
 Extract locations from srdb_winter
@@ -78,7 +106,7 @@ Extract locations from srdb_winter
  Wettest 3 months - Dryest 3 months -> precipitation seasonality
  Compute MAT and MAP
  
-```{r mat-map}
+```{r mat-map, echo = FALSE}
 # Download worldclim data for precip and tmean if necessary, into wc10/ folder
 precip <- getData("worldclim", path = "../Data/wc10/", var = "prec", res = 10, download = !file.exists("../Data/wc10/wc10/precip1.hdr"))
 tmean <- getData("worldclim", path = "../Data/wc10/", var = "tmean", res = 10, download = !file.exists("../Data/wc10/wc10/tmean1.hdr"))
@@ -89,16 +117,16 @@ srdb_winter %>%
 
 # Extract srdb_winter location data from worldclim data for precip...
 raster::extract(precip, winter_coords[3:4]) -> precip_coords
-apply(precip_coords, 1, sum) -> map_winter
-cbind(winter_coords, map_winter) -> map_coords
+apply(precip_coords, 1, sum) -> map_srdb
+cbind(winter_coords, map_srdb) -> map_coords
 
 
 # ...and tmean
 raster::extract(tmean, winter_coords[3:4]) -> tmean_vals
-apply(tmean_vals, 1, mean) -> mat_winter
-cbind(map_coords, mat_winter)  %>%
+apply(tmean_vals, 1, mean) -> mat_srdb
+cbind(map_coords, mat_srdb)  %>%
   # Temp data is stored in degC * 10, so we need to divide to get back to degC
-  mutate(mat_winter = mat_winter / 10)   -> winter_points
+  mutate(mat_srdb = mat_srdb / 10)   -> winter_points
 # %>% 
 #     distinct(Latitude, Longitude, .keep_all = TRUE)
 
@@ -130,7 +158,7 @@ left_join(map, mat, by = c("x", "y")) %>%
 # Try Mark Tjoelker's suggestion re Whittaker biomes
 library(plotbiomes) # devtools::install_github("valentinitnelav/plotbiomes")
 p_inset <- whittaker_base_plot() +
-  geom_point(data = winter_points, aes(x = mat_winter, y = map_winter / 10),
+  geom_point(data = winter_points, aes(x = mat_srdb, y = map_srdb / 10),
              color = "black", shape = 4) +
   theme(axis.title = element_blank(),
         axis.text = element_text(size = 8),
@@ -148,7 +176,7 @@ p <- ggplot() +
   geom_hex(data = map_mat_global,
            aes(x = mat, y = map / 10), bins = 100, na.rm = TRUE) +
   scale_fill_viridis_c(name = "Grid cells", begin = 0.85, end = 0) +
-  geom_point(data = winter_points, aes(x = mat_winter, y = map_winter / 10),
+  geom_point(data = winter_points, aes(x = mat_srdb, y = map_srdb / 10),
              color = "black", shape = 4, size = 1.5, na.rm = TRUE) +
   theme_minimal() +
   labs(x = "MAT (°C)", y = "MAP (cm)")
@@ -163,7 +191,7 @@ print(p_new)
 #save_plot("figures/figure3-climate-whittaker.png", p_new, base_height = 5)
 ```
 
-```{r seasonality}
+```{r seasonality, echo = FALSE}
 
 cbind(winter_coords, precip_coords) %>% 
 pivot_longer(prec1:prec12) %>% 
@@ -211,7 +239,7 @@ srdb_winter %>%
 
 Compute seasonality
 
-```{r maps}
+```{r maps, echo = FALSE}
 
 world <- map_data("world")
 smap <- get_stamenmap(bbox = c(left = -180, bottom = -80, right = 179.9999, top = 85), zoom = 3)
@@ -223,25 +251,28 @@ seasonality %>%
   ggmap(smap) +
   geom_point(data = t, aes(x = Longitude, y = Latitude,
                            color = temp_seasonality)) +
-  scale_color_viridis(begin = 1, end = 0.3, option = "plasma")
+  scale_color_viridis(begin = 1, end = 0.3, option = "plasma") -> map1
   
 # precip seasonality  
   ggmap(smap) +
   geom_point(data = t, aes(x = Longitude, y = Latitude,
                            color = precip_seasonality)) +
-  scale_color_viridis(begin = 1, end = 0.3, option = "viridis")
+  scale_color_viridis(begin = 1, end = 0.3, option = "viridis") -> map2
 
 # map
   ggmap(smap) +
   geom_point(data = winter_points, aes(x = Longitude, y = Latitude,
-                           color = map_winter)) +
-  scale_color_viridis(begin = 1, end = 0.3, option = "mako")
+                           color = map_srdb)) +
+  scale_color_viridis(begin = 1, end = 0.3, option = "viridis") -> map3
   
 #mat
   ggmap(smap) +
   geom_point(data = winter_points, aes(x = Longitude, y = Latitude,
-                           color = mat_winter)) +
-  scale_color_viridis(begin = 1, end = 0.3, option = "mako")
+                           color = mat_srdb)) +
+  scale_color_viridis(begin = 1, end = 0.3, option = "plasma") -> map4
+  
+  plot_grid(map1, map2, map3, map4)
+  
 ```
 
 ```{r rs-rh, echo = FALSE}
@@ -254,10 +285,10 @@ srdb_winter %>%
   theme_cowplot() + 
   geom_smooth(method='lm', color = "black", se = FALSE)-> p
 
-p + geom_point(aes(color = map_winter), size = 3) + 
+p + geom_point(aes(color = map_srdb), size = 3) + 
   scale_color_viridis(option = "mako", begin = 1, end = 0.4) -> p1
 
-p + geom_point(aes(color = mat_winter), size = 3)  + 
+p + geom_point(aes(color = mat_srdb), size = 3)  + 
   scale_color_viridis(option = "inferno", begin = 1, end = 0.4) -> p2
 
 p + geom_point(aes(color = precip_seasonality), size = 3)  + 
@@ -270,7 +301,7 @@ plot_grid(p1, p2, p3, p4)
 
 ```
 
-Some studies report mat and map in SRDB, let's check how similar these are to WorldClim data
+#### Some studies report mat and map in SRDB, let's check how similar these are to WorldClim data
 ```{r checks, echo=FALSE}
 
 # Some studies report mat and map in SRDB, let's check how similar these are to WorldClim data
@@ -278,28 +309,45 @@ srdb_winter %>%
   dplyr::select(Record_number, Study_number, MAT, MAP) %>% 
   left_join(winter_points, by = c("Record_number", "Study_number")) -> d
 
-ggplot(d, aes(x = MAT, y = mat_winter)) +
+ggplot(d, aes(x = MAT, y = mat_srdb)) +
   geom_abline(intercept = 0) +
+  geom_smooth(method = "lm", se = FALSE) +
   geom_point() -> mat
 
-ggplot(d, aes(x = MAP, y = map_winter)) +
+ggplot(d, aes(x = MAP, y = map_srdb)) +
   geom_abline(intercept = 0) +
+  geom_smooth(method = "lm", se = FALSE) +
   geom_point() -> map
 
 plot_grid(mat, map)
 
 ```
 
-```{r linear-model}
+
+#### Model 1
+
+`lm(Rh_annual ~ Rs_winter + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit, data = fulldata)`
+
+#### Model 2
+`lm(Rh_annual ~ Rs_winter * temp_seasonality + Rs_winter * precip_seasonality + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit, data = fulldata)`
+
+```{r linear-model, echo = FALSE}
 
 srdb_winter %>% 
   dplyr::select(Record_number, Study_number, Rs_winter, Rh_annual, Biome, Leaf_habit) %>% 
   left_join(seasonality, by = "Record_number") %>% 
   left_join(winter_points, by = "Record_number") -> fulldata
 
-lm(Rh_annual ~ Rs_winter + mat_winter + map_winter + temp_seasonality + precip_seasonality + Leaf_habit,
-   data = fulldata) -> lm
+lm(Rh_annual ~ Rs_winter + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit, data = fulldata) -> model1
 
-summary(lm)
+lm(Rh_annual ~ Rs_winter * temp_seasonality + Rs_winter * precip_seasonality + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit,
+   data = fulldata) -> model2
+
+stepAIC(model2) -> model2_reduced
+
+compare_performance(model1, model2, model2_reduced)
+
+check_model(model2_reduced)
+
 ```
 
