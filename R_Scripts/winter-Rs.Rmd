@@ -108,8 +108,8 @@ Extract locations from srdb_winter
  
 ```{r mat-map, echo = FALSE}
 # Download worldclim data for precip and tmean if necessary, into wc10/ folder
-precip <- getData("worldclim", path = "../Data/wc10/", var = "prec", res = 10, download = !file.exists("../Data/wc10/wc10/precip1.hdr"))
-tmean <- getData("worldclim", path = "../Data/wc10/", var = "tmean", res = 10, download = !file.exists("../Data/wc10/wc10/tmean1.hdr"))
+precip <- getData("worldclim", path = "../Data/", var = "prec", res = 10, download = !file.exists("../Data/wc10/wc10/precip1.hdr"))
+tmean <- getData("worldclim", path = "../Data/", var = "tmean", res = 10, download = !file.exists("../Data/wc10/wc10/tmean1.hdr"))
 
 # Pull out srdb_winter dataset latitudes and longitudes
 srdb_winter %>%
