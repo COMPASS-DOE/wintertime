@@ -328,6 +328,16 @@ plot_grid(mat, map)
 
 `lm(Rh_annual ~ Rs_winter + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit, data = fulldata)`
 
+Predictor | Rationale
+--------- | ----------
+`Rs_winter` | Higher wintertime Rs -> higher wintertime Rh -> higher Rh_annual
+`mat_srdb` | Colder places = Rs_winter a better proxy for Rh?
+`map_srdb` | Not sure
+`temp_seasonality` | Higher growing season temperatures -> higher Rh_annual
+`precip_seasonality` | Higher growing season precip -> higher Rh_annual
+`Leaf_habit` | Maybe more labile carbon under deciduous?
+
+
 #### Model 2
 `lm(Rh_annual ~ Rs_winter * temp_seasonality + Rs_winter * precip_seasonality + mat_srdb + map_srdb + temp_seasonality + precip_seasonality + Leaf_habit, data = fulldata)`
 
